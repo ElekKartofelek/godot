@@ -1397,6 +1397,14 @@ bool Window::get_force_native() const {
 	return force_native;
 }
 
+void Window::set_transparent_input(bool p_transparent_input) {
+	transparent_input = p_transparent_input;
+}
+
+bool Window::get_transparent_input() const {
+	return transparent_input;
+}
+
 Viewport *Window::get_embedder() const {
 	ERR_READ_THREAD_GUARD_V(nullptr);
 	if (force_native && DisplayServer::get_singleton()->has_feature(DisplayServer::FEATURE_SUBWINDOWS) && !is_in_edited_scene_root()) {
@@ -3309,6 +3317,9 @@ void Window::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_force_native", "force_native"), &Window::set_force_native);
 	ClassDB::bind_method(D_METHOD("get_force_native"), &Window::get_force_native);
 
+	ClassDB::bind_method(D_METHOD("set_transparent_input", "transparent_input"), &Window::set_transparent_input);
+	ClassDB::bind_method(D_METHOD("get_transparent_input"), &Window::get_transparent_input);
+
 	ClassDB::bind_method(D_METHOD("set_content_scale_size", "size"), &Window::set_content_scale_size);
 	ClassDB::bind_method(D_METHOD("get_content_scale_size"), &Window::get_content_scale_size);
 
@@ -3452,6 +3463,7 @@ void Window::_bind_methods() {
 	ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "minimize_disabled"), "set_flag", "get_flag", FLAG_MINIMIZE_DISABLED);
 	ADD_PROPERTYI(PropertyInfo(Variant::BOOL, "maximize_disabled"), "set_flag", "get_flag", FLAG_MAXIMIZE_DISABLED);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "force_native"), "set_force_native", "get_force_native");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "transparent_input"), "set_transparent_input", "get_transparent_input");
 
 	ADD_GROUP("Limits", "");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2I, "min_size", PROPERTY_HINT_NONE, "suffix:px"), "set_min_size", "get_min_size");

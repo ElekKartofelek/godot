@@ -143,6 +143,7 @@ private:
 	bool clamp_to_embedder = false;
 	bool unparent_when_invisible = false;
 	bool keep_title_visible = false;
+	bool transparent_input = false;
 
 	LayoutDirection layout_dir = LAYOUT_DIRECTION_INHERITED;
 
@@ -309,6 +310,9 @@ public:
 
 	void set_force_native(bool p_force_native);
 	bool get_force_native() const;
+
+	void set_transparent_input(bool p_transparent_input);
+	bool get_transparent_input() const;
 
 	void set_current_screen(int p_screen);
 	int get_current_screen() const;
