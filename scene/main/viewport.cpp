@@ -3203,9 +3203,104 @@ bool Viewport::_sub_windows_forward_input(const Ref<InputEvent> &p_event) {
 				}
 			}
 		}
+
+		// Check for transparent_input windows under the cursor and forward to them
+		// Scroll always passes through
+		if (me.is_valid()) {
+			for (int i = gui.sub_windows.size() - 1; i >= 0; i--) {
+				const SubWindow &sw = gui.sub_windows[i];
+				if (!sw.window->get_transparent_input()) {
+					continue;
+				}
+				Rect2i r = Rect2i(sw.window->get_position(), sw.window->get_size());
+				if (r.has_point(me->get_position())) {
+					Transform2D window_ofs;
+					window_ofs.set_origin(-sw.window->get_position());
+					Ref<InputEvent> ev = p_event->xformed_by(window_ofs);
+					sw.window->_window_input(ev);
+
+					// Scroll: always pass through to parent viewport.
+					Ref<InputEventMouseButton> scroll_mb = p_event;
+					if (scroll_mb.is_valid()) {
+						MouseButton btn = scroll_mb->get_button_index();
+						if (btn == MouseButton::WHEEL_UP || btn == MouseButton::WHEEL_DOWN ||
+								btn == MouseButton::WHEEL_LEFT || btn == MouseButton::WHEEL_RIGHT) {
+							return false;
+						}
+					}
+					return true;
+				}
+			}
+		}
+
 		return false;
 	}
 
+	// --- Focused sub-window handling ---
+
+	if (gui.subwindow_focused->get_transparent_input()) {
+		// Determine if the window currently owns the interaction:
+		// - A control inside has keyboard focus, OR
+		// - A mouse button is held down on a control (slider drag, etc.)
+		bool window_has_key_focus = gui.subwindow_focused->gui_get_focus_owner() != nullptr;
+		bool window_has_mouse_grab = !gui.subwindow_focused->gui.mouse_focus_mask.is_empty();
+		bool window_owns_interaction = window_has_key_focus || window_has_mouse_grab;
+
+		// Helper lambda to forward event into the window.
+		auto forward_to_window = [&]() {
+			Transform2D window_ofs;
+			window_ofs.set_origin(-gui.subwindow_focused->get_position());
+			Ref<InputEvent> ev = p_event->xformed_by(window_ofs);
+			gui.subwindow_focused->_window_input(ev);
+		};
+
+		// Scroll events: always forward + pass through
+		Ref<InputEventMouseButton> scroll_mb = p_event;
+		if (scroll_mb.is_valid()) {
+			MouseButton btn = scroll_mb->get_button_index();
+			if (btn == MouseButton::WHEEL_UP || btn == MouseButton::WHEEL_DOWN ||
+					btn == MouseButton::WHEEL_LEFT || btn == MouseButton::WHEEL_RIGHT) {
+				forward_to_window();
+				return false; // Parent viewport also processes scroll.
+			}
+		}
+
+		// Mouse events
+		Ref<InputEventMouse> me = p_event;
+		if (me.is_valid()) {
+			Rect2i r = Rect2i(gui.subwindow_focused->get_position(), gui.subwindow_focused->get_size());
+
+			if (r.has_point(me->get_position())) { // Mouse inside window — always forward and consume.
+				forward_to_window();
+				return true;
+			}
+
+			if (window_has_mouse_grab) { // Mouse outside window but a control has mouse grab (e.g. slider drag).
+				forward_to_window();
+				return true;
+			}
+
+			// Mouse outside window, no mouse grab — pass through to parent viewport.
+			return false;
+		}
+
+		// Keyboard events
+		Ref<InputEventKey> ke = p_event;
+		if (ke.is_valid() && ke->get_keycode() == Key::TAB) {
+			if (gui.subwindow_focused->gui_get_focus_owner() != nullptr) {
+				forward_to_window();
+				return true;  // Tab cycles inside window only.
+			}
+			return false;  // Tab cycles in parent only.
+		}
+
+		// All other keyboard input -> forward to window + pass through.
+		forward_to_window();
+		return false;
+
+	}
+
+	// Normal (non-transparent) focused window — original behavior: consume everything.
 	Transform2D window_ofs;
 	window_ofs.set_origin(-gui.subwindow_focused->get_position());
 
