@@ -16,20 +16,72 @@ echo "  3) Both"
 echo ""
 read -rp "Choice [1/2/3]: " CHOICE
 
-# Add any custom flags here (modules, arch, etc.)
+# Add any custom flags here (modules, etc.)
 EXTRA_FLAGS=""
+
+JOBS="-j$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
 
 build_editor() {
     echo "=== Building Editor ==="
-    scons platform="$PLATFORM" target=editor $EXTRA_FLAGS -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
+    if [ "$PLATFORM" = "macos" ]; then
+        scons platform=macos target=editor arch=x86_64 $EXTRA_FLAGS $JOBS
+        scons platform=macos target=editor arch=arm64 generate_bundle=yes $EXTRA_FLAGS $JOBS
+        lipo -create \
+            bin/godot.macos.editor.x86_64 \
+            bin/godot.macos.editor.arm64 \
+            -output bin/godot.macos.editor.universal
+    else
+        scons platform="$PLATFORM" target=editor $EXTRA_FLAGS $JOBS
+    fi
 }
 
 build_templates() {
-    echo "=== Building Debug Export Template ==="
-    scons platform="$PLATFORM" target=template_debug $EXTRA_FLAGS -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
+    echo ""
+    echo "Which templates?"
+    echo "  1) Debug only (fastest, good for testing)"
+    echo "  2) Debug + Release"
+    echo "  3) Debug + Release (production=yes, slow but optimized)"
+    echo ""
+    read -rp "Choice [1/2/3]: " TMPL_CHOICE
 
-    echo "=== Building Release Export Template ==="
-    scons platform="$PLATFORM" target=template_release production=yes $EXTRA_FLAGS -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
+    if [ "$PLATFORM" = "macos" ]; then
+        echo "=== Building Debug Export Template ==="
+        scons platform=macos target=template_debug arch=x86_64 $EXTRA_FLAGS $JOBS
+        scons platform=macos target=template_debug arch=arm64 $EXTRA_FLAGS $JOBS
+        lipo -create \
+            bin/godot.macos.template_debug.x86_64 \
+            bin/godot.macos.template_debug.arm64 \
+            -output bin/godot.macos.template_debug.universal
+
+        if [ "$TMPL_CHOICE" = "2" ]; then
+            echo "=== Building Release Export Template ==="
+            scons platform=macos target=template_release arch=x86_64 $EXTRA_FLAGS $JOBS
+            scons platform=macos target=template_release arch=arm64 $EXTRA_FLAGS $JOBS
+            lipo -create \
+                bin/godot.macos.template_release.x86_64 \
+                bin/godot.macos.template_release.arm64 \
+                -output bin/godot.macos.template_release.universal
+        elif [ "$TMPL_CHOICE" = "3" ]; then
+            echo "=== Building Release Export Template (production) ==="
+            scons platform=macos target=template_release arch=x86_64 production=yes $EXTRA_FLAGS $JOBS
+            scons platform=macos target=template_release arch=arm64 production=yes $EXTRA_FLAGS $JOBS
+            lipo -create \
+                bin/godot.macos.template_release.x86_64 \
+                bin/godot.macos.template_release.arm64 \
+                -output bin/godot.macos.template_release.universal
+        fi
+    else
+        echo "=== Building Debug Export Template ==="
+        scons platform="$PLATFORM" target=template_debug $EXTRA_FLAGS $JOBS
+
+        if [ "$TMPL_CHOICE" = "2" ]; then
+            echo "=== Building Release Export Template ==="
+            scons platform="$PLATFORM" target=template_release $EXTRA_FLAGS $JOBS
+        elif [ "$TMPL_CHOICE" = "3" ]; then
+            echo "=== Building Release Export Template (production) ==="
+            scons platform="$PLATFORM" target=template_release production=yes $EXTRA_FLAGS $JOBS
+        fi
+    fi
 }
 
 case "$CHOICE" in
